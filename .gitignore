@@ -1,0 +1,13 @@
+# Match data and anything derived from it must not be published (RULES.md, "The data").
+/cache/
+/external/
+/data/
+*.mp4
+*.csv
+!scripts/*.csv
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.partial
