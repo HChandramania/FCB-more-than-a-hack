@@ -8,12 +8,10 @@ import numpy as np
 import pandas as pd
 
 from . import external, paths
+from .competition import GAME, GAMES, asset_paths, half_video_blocks
 
-paths.competition_modules()
-import possession_metrics as metrics  # noqa: E402
-from games import GAME, GAMES, asset_paths, half_video_blocks  # noqa: E402
-
-H, A, D, X = metrics.H, metrics.A, metrics.D, metrics.X
+H, A, D, X = external.H, external.A, external.D, external.X
+LABELS = ("H", "A", "D", "X")
 FPS = 25
 # NaN frames between the halves of an external match. Wider than twice any smoothing window, so
 # no window spans two halves, and labelled X, so the scorer treats each half as its own run.

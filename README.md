@@ -30,6 +30,23 @@ settings chosen without it. spellF1 is the official ranking metric.
 | Sportec Open DFL, 7 matches | 0.769 | 0.752 |
 
 `docs/experiments.md` lists every experiment, including the rejected ones, with its numbers.
+The public-window pipeline check and its limits are in `docs/evaluation.md`.
+
+## Documentation
+
+| Document | What it covers |
+|---|---|
+| [docs/setup.md](docs/setup.md) | Install, data placement, tests and the submission. |
+| [docs/dataset.md](docs/dataset.md) | The exact `data/` layout and which files are used. |
+| [docs/architecture.md](docs/architecture.md) | End-to-end data flow and module map. |
+| [docs/model.md](docs/model.md) | Features, classifiers, ensemble and decoding. |
+| [docs/training.md](docs/training.md) | External data, retraining and caches. |
+| [docs/evaluation.md](docs/evaluation.md) | Metrics, verified scores and caveats. |
+| [docs/reproducibility.md](docs/reproducibility.md) | Checksums and the exact reproduction path. |
+| [docs/troubleshooting.md](docs/troubleshooting.md) | Common setup errors. |
+| [docs/third-party.md](docs/third-party.md) | Licences for vendored constants and data. |
+| [docs/experiments.md](docs/experiments.md) | The full experiment log. |
+
 
 ## Reproduce the submission
 
@@ -37,13 +54,16 @@ Requirements: Linux, Python 3.14, [uv](https://docs.astral.sh/uv/). A GPU is opt
 
 ```bash
 uv sync                                   # exact versions from uv.lock
-git clone https://github.com/metrica-sports/more-than-a-hack-2027 ../more-than-a-hack-2027
-# put the match data bundle into ../more-than-a-hack-2027/data/ (see that repository's DATA.md)
+# put the match bundle into data/ (see docs/dataset.md)
 uv run python scripts/predict.py submission.csv
 ```
 
 This writes the submitted file from the trained classifiers in `models/` (about 2 minutes on a
 CPU). `sha256sum submission.csv` must give the value in `tests/test_match_data.py`.
+
+The predictor reads only `data/tactical/BAR-ATH_tactical_atd.txt` and
+`data/tactical/BAR-ATH_tactical_atd.xml`. The videos, homography, Smart Tagging and the broadcast
+recording are optional and unused. Put the bundle somewhere else with `MTAH_DATA_DIR`.
 
 To train the classifiers again from the external data:
 
@@ -61,8 +81,8 @@ TCN can differ in its last bits on other hardware; the shipped weights remove th
 Prediction runs on the CPU only.
 `models/SHA256SUMS` holds the checksums of the shipped weights.
 
-Paths can be changed with environment variables: `MTAH_COMPETITION_REPO` (the organisers'
-repository with `data/`), `MTAH_EXTERNAL_DIR`, `MTAH_CACHE_DIR` and `MTAH_MODEL_DIR`.
+Paths can be changed with environment variables: `MTAH_DATA_DIR` (the folder containing
+`tactical/` and `broadcast/`), `MTAH_EXTERNAL_DIR`, `MTAH_CACHE_DIR` and `MTAH_MODEL_DIR`.
 
 ## Tests
 
@@ -70,15 +90,15 @@ repository with `data/`), `MTAH_EXTERNAL_DIR`, `MTAH_CACHE_DIR` and `MTAH_MODEL_
 uv run pytest
 ```
 
-The unit tests need no data. The tests in `tests/test_match_data.py` need the match data. They
-check the team symmetry of every classifier and that `scripts/predict.py` writes the submitted
-file byte for byte.
+The unit tests need no data. The two tests in `tests/test_match_data.py` load the real match: one
+checks team symmetry, the other recomputes the submission byte for byte. They are skipped when
+`data/tactical/` is absent. With the bundle in place, the suite is **12 passed**.
 
 ## Data
 
 | data | use | source and licence |
 |---|---|---|
-| Competition match: tactical tracking (ATD) and the graded-frame table | input of the prediction only | provided by the organisers; not redistributed here |
+| Competition match: tactical tracking (ATD) | input of the prediction only | provided by the organisers; not redistributed here |
 | Sportec Open DFL dataset, 7 matches | training and validation | Bassek et al. 2025, *Scientific Data* 12:195, [figshare 28196177](https://doi.org/10.6084/m9.figshare.28196177), CC BY 4.0. Labels: the provider's per-frame BallPossession and BallStatus flags |
 | Metrica Sports sample data, games 1–3 | training and validation | [metrica-sports/sample-data](https://github.com/metrica-sports/sample-data). Labels: derived in code from Metrica's event data (`possession/external.py`) |
 
@@ -90,6 +110,8 @@ No external data covers the competition match.
 
 ```
 possession/      the package
+  competition.py   BAR-ATH constants and asset paths
+  paths.py         data/, external/, cache/ and models/ locations
   data.py          match loaders, the control rule, the graded frames
   external.py      readers of the DFL and Metrica files and the Metrica label derivation
   augment.py       simulated ball and player loss for training; the player-gap fill
@@ -101,5 +123,6 @@ possession/      the package
 scripts/         download_external.py, train.py, predict.py
 models/          trained classifiers of the submission
 tests/           unit tests and checks on the match data
-docs/            experiment log
+data/            the gated match bundle (not committed)
+docs/            setup, dataset, architecture, model, training, evaluation, reproducibility
 ```

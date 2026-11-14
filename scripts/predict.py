@@ -21,7 +21,7 @@ def main(path):
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as handle:
         handle.write("frame,label\n")
-        handle.writelines("{},{}\n".format(frame, data.metrics.LABELS[code]) for frame, code in enumerate(labels))
+        handle.writelines("{},{}\n".format(frame, data.LABELS[code]) for frame, code in enumerate(labels))
     print("wrote", path)
 
 
