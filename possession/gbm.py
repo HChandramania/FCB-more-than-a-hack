@@ -43,7 +43,7 @@ def dead_features(match):
     """(names, (frames, features)) of dead_team_sym: pooled player signals and per-team signals without the ball."""
     names, table = features.player_signals(match)
     team_names, team_table = features.team_signals(match, with_ball=False)
-    return features.multi_scale(names + team_names, np.concatenate((table, team_table), axis=1))
+    return features.multi_scale(names + team_names, np.concatenate((table, team_table), axis=1), match.halves or None)
 
 
 def team_features(match):
@@ -51,10 +51,10 @@ def team_features(match):
 
     The touch timing signals enter raw and at multiple scales.
     """
-    names, table = features.multi_scale(*features.team_signals(match, with_ball=True))
+    names, table = features.multi_scale(*features.team_signals(match, with_ball=True), segments=match.halves or None)
     touch_names, touch_table = features.touch_signals(match)
-    scaled_names, scaled_table = features.multi_scale(touch_names, touch_table)
-    advance_names, advance_table = features.multi_scale(*features.ball_advance_signals(match))
+    scaled_names, scaled_table = features.multi_scale(touch_names, touch_table, match.halves or None)
+    advance_names, advance_table = features.multi_scale(*features.ball_advance_signals(match), segments=match.halves or None)
     return (names + touch_names + scaled_names + advance_names,
             np.concatenate((table, touch_table.astype(np.float32), scaled_table, advance_table), axis=1))
 

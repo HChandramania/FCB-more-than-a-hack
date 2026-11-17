@@ -73,26 +73,29 @@ def fill_player_gaps(match, max_seconds):
     """Copy of the match where each gap of at most max_seconds inside one track slot is filled by linear interpolation.
 
     A slot keeps one player: on the competition match a slot that comes back after a gap has moved at
-    a median 0.2-1.5 m/s. Gaps at the start or end of a slot stay empty. Half time is longer than any
-    max_seconds in use, so no fill crosses it.
+    a median 0.2-1.5 m/s. Gaps at the start or end of a slot stay empty. Interpolation is restricted
+    to each Match.halves span.
     """
     if max_seconds <= 0:
         return match
     players = match.players_m.copy()
     longest = int(round(max_seconds * FPS))
     frames = np.arange(len(players))
+    halves = match.halves or ((0, len(players)),)
     for slot in range(players.shape[1]):
-        tracked = np.isfinite(players[:, slot, 0])
-        if not tracked.any():
-            continue
-        change = np.diff(tracked.astype(np.int8))
-        gap_starts = np.flatnonzero(change == -1) + 1
-        gap_stops = np.flatnonzero(change == 1) + 1
-        # A slot that starts untracked has a first gap_stop without a gap_start; drop it.
-        gap_stops = gap_stops[gap_stops > gap_starts[0]] if len(gap_starts) > 0 else gap_stops[:0]
-        for start, stop in zip(gap_starts, gap_stops):
-            if stop - start > longest:
+        for half_start, half_stop in halves:
+            tracked = np.isfinite(players[half_start:half_stop, slot, 0])
+            if not tracked.any():
                 continue
-            fraction = (frames[start:stop] - (start - 1)) / (stop - (start - 1))
-            players[start:stop, slot] = players[start - 1, slot] + fraction[:, None] * (players[stop, slot] - players[start - 1, slot])
+            change = np.diff(tracked.astype(np.int8))
+            gap_starts = np.flatnonzero(change == -1) + half_start + 1
+            gap_stops = np.flatnonzero(change == 1) + half_start + 1
+            # A slot that starts untracked has a first gap_stop without a gap_start; drop it.
+            gap_stops = gap_stops[gap_stops > gap_starts[0]] if len(gap_starts) > 0 else gap_stops[:0]
+            for start, stop in zip(gap_starts, gap_stops):
+                if stop - start > longest:
+                    continue
+                fraction = (frames[start:stop] - (start - 1)) / (stop - (start - 1))
+                players[start:stop, slot] = (players[start - 1, slot]
+                                              + fraction[:, None] * (players[stop, slot] - players[start - 1, slot]))
     return dataclasses.replace(match, players_m=players)

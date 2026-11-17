@@ -67,8 +67,10 @@ def base_signals(match, kind):
     return [n for part in parts for n in part[0]], np.concatenate([part[1] for part in parts], axis=1)
 
 
-def to_steps(values):
+def to_steps(values, segments=None):
     """Mean over blocks of STEP_FRAMES frames that skips NaN; NaN where a block has no value."""
+    if segments is not None:
+        return np.concatenate([to_steps(values[start:stop]) for start, stop in segments])
     steps = len(values) // STEP_FRAMES
     blocks = values[:steps * STEP_FRAMES].reshape(steps, STEP_FRAMES, *values.shape[1:])
     valid = np.isfinite(blocks)
@@ -76,8 +78,10 @@ def to_steps(values):
         return np.where(valid, blocks, 0.0).sum(axis=1) / valid.sum(axis=1)
 
 
-def step_labels(labels):
+def step_labels(labels, segments=None):
     """Label of the centre frame of each block."""
+    if segments is not None:
+        return np.concatenate([step_labels(labels[start:stop]) for start, stop in segments])
     steps = len(labels) // STEP_FRAMES
     return labels[STEP_FRAMES // 2:steps * STEP_FRAMES:STEP_FRAMES]
 
@@ -85,7 +89,7 @@ def step_labels(labels):
 def step_inputs(match, kind):
     """(signal names, signals at steps) of one match: the input of `probability`."""
     names, table = base_signals(match, kind)
-    return names, to_steps(table).astype(np.float32)
+    return names, to_steps(table, match.halves or None).astype(np.float32)
 
 
 def _prepared(match, kind, share=0.0, placement="live"):
@@ -96,7 +100,7 @@ def _prepared(match, kind, share=0.0, placement="live"):
         return list(stored["names"]), stored["signals"], stored["labels"]
     gapped = augment.add_live_ball_gaps(match, share, zlib.crc32(match.name.encode()) + 13, placement)
     names, signals = step_inputs(gapped, kind)
-    labels = step_labels(match.labels)
+    labels = step_labels(match.labels, match.halves or None)
     path.parent.mkdir(parents=True, exist_ok=True)
     data.save_npz_atomic(path, names=np.array(names), signals=signals, labels=labels)
     return names, signals, labels
@@ -257,7 +261,7 @@ def load(kind):
     return torch.load(path, weights_only=False)
 
 
-def probability(saved, names, signals, kind):
+def probability(saved, names, signals, kind, segments=None):
     """Per-frame team-symmetric probability (P(dead) or P(home | live)) at 25 fps from step signals.
 
     Runs on the CPU: inference of one match takes seconds.
@@ -267,10 +271,23 @@ def probability(saved, names, signals, kind):
     network = TCN(2 * len(names), saved["channels"])
     network.load_state_dict(saved["state"])
     network.eval()
-    x = network_input(signals, saved["mean"], saved["std"])
-    swapped = exchanged_input(x, features.swap_order(list(names)))
-    with torch.no_grad():
-        direct = torch.sigmoid(network(torch.from_numpy(x)[None]))[0].numpy()
-        mirror = torch.sigmoid(network(torch.from_numpy(swapped)[None]))[0].numpy()
-    steps = 0.5 * (direct + (mirror if is_dead_kind(kind) else 1.0 - mirror))
+    if segments is None:
+        chunks = [signals]
+    else:
+        counts = [(stop - start) // STEP_FRAMES for start, stop in segments]
+        chunks, offset = [], 0
+        for count in counts:
+            chunks.append(signals[offset:offset + count])
+            offset += count
+    outputs = []
+    for chunk in chunks:
+        if len(chunk) == 0:
+            continue
+        x = network_input(chunk, saved["mean"], saved["std"])
+        swapped = exchanged_input(x, features.swap_order(list(names)))
+        with torch.no_grad():
+            direct = torch.sigmoid(network(torch.from_numpy(x)[None]))[0].numpy()
+            mirror = torch.sigmoid(network(torch.from_numpy(swapped)[None]))[0].numpy()
+        outputs.append(0.5 * (direct + (mirror if is_dead_kind(kind) else 1.0 - mirror)))
+    steps = np.concatenate(outputs) if outputs else np.empty(0)
     return np.repeat(steps, STEP_FRAMES)

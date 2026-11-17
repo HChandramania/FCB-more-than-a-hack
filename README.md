@@ -21,29 +21,37 @@ exchanging home and away mirrors P(home) and keeps P(dead).
 
 ## Results on the external matches
 
-Nested leave-one-match-out validation: each match is scored by models that never saw it, with
-settings chosen without it. spellF1 is the official ranking metric.
+Historical development results, not independently reproduced in the final audit. The development
+log describes nested leave-one-match-out selection, but its experiment scripts and per-fold records
+are not included here. Out-of-sample predictions and nested selection cannot be independently
+verified from this checkout. spellF1 is the official ranking metric.
 
 | validation set | spellF1 | spellF1, 10 % of player-frames removed |
 |---|---|---|
 | Metrica sample games 1–3 | 0.816 | 0.792 |
 | Sportec Open DFL, 7 matches | 0.769 | 0.752 |
 
-`docs/experiments.md` lists every experiment, including the rejected ones, with its numbers.
+These four rounded values originate in this README; the available experiment log does not provide
+the per-fold values needed to recalculate them. macroF1 was not recorded in the available final-result
+evidence. See [external evaluation audit](docs/external_evaluation.md).
 
 ## Reproduce the submission
 
-Requirements: Linux, Python 3.14, [uv](https://docs.astral.sh/uv/). A GPU is optional.
+Requirements: Python 3.14, [uv](https://docs.astral.sh/uv/). Windows CPU inference has passed the
+local audit. A GPU is not required for prediction. Authorized access to both tactical ATD files
+(TXT and original XML) is required.
 
 ```bash
-uv sync                                   # exact versions from uv.lock
+uv sync --locked                          # exact versions from uv.lock
 git clone https://github.com/metrica-sports/more-than-a-hack-2027 ../more-than-a-hack-2027
 # put the match data bundle into ../more-than-a-hack-2027/data/ (see that repository's DATA.md)
 uv run python scripts/predict.py submission.csv
 ```
 
-This writes the submitted file from the trained classifiers in `models/` (about 2 minutes on a
-CPU). `sha256sum submission.csv` must give the value in `tests/test_match_data.py`.
+This writes a new file from the trained classifiers in `models/`. The audited Windows CPU run took
+300.91 seconds. Do not run this command over an existing validated submission. Use
+[reproduction instructions](docs/reproduction.md) for an isolated output, explicit dataset paths,
+model checksums, and a user-run byte-for-byte comparison that preserves the original CSV.
 
 To train the classifiers again from the external data:
 
@@ -53,26 +61,29 @@ uv run python scripts/train.py               # writes models/; about 30 minutes,
 uv run python scripts/predict.py submission.csv
 ```
 
-A rebuild from empty folders on the development machine (RTX 5080, CUDA 13.0, the versions in
-`uv.lock`) gives model files identical byte for byte to the shipped ones and an identical
-submission. GPU training is deterministic
-(`torch.use_deterministic_algorithms`). Other GPU models can round differently, so a retrained
-TCN can differ in its last bits on other hardware; the shipped weights remove that dependency.
-Prediction runs on the CPU only.
+The development log reports identical rebuilds on its original machine; these claims were not
+independently reproduced in the final audit. The current Windows submission passed the official
+format validator, but a second-run hash comparison has not been performed. The historical hash in
+`tests/test_match_data.py` has not been checked against that submission. Windows writes CRLF while
+Linux normally writes LF; both validate, but their file hashes differ. Prediction uses the CPU.
+Deterministic training settings are present, but identical retraining across hardware is not assured.
 `models/SHA256SUMS` holds the checksums of the shipped weights.
 
 Paths can be changed with environment variables: `MTAH_COMPETITION_REPO` (the organisers'
-repository with `data/`), `MTAH_EXTERNAL_DIR`, `MTAH_CACHE_DIR` and `MTAH_MODEL_DIR`.
+repository), `MTAH_DATA_DIR` (dataset root containing `tactical/`), `MTAH_EXTERNAL_DIR`,
+`MTAH_CACHE_DIR` and `MTAH_MODEL_DIR`. Use a fresh cache for a new dataset: match caches do not
+validate source provenance. Keep the LightGBM files byte-identical; `.gitattributes` disables
+Git text conversion for `models/*.txt`.
 
 ## Tests
 
 ```bash
-uv run pytest
+uv run --no-sync python -B -m pytest -q -p no:cacheprovider tests/test_control_rule.py tests/test_decoding.py tests/test_fill_gaps.py
 ```
 
-The unit tests need no data. The tests in `tests/test_match_data.py` need the match data. They
-check the team symmetry of every classifier and that `scripts/predict.py` writes the submitted
-file byte for byte.
+The ten selected unit tests need no match data. Do not run the complete suite automatically:
+`tests/test_match_data.py` invokes full-match inference. Its skip condition checks the default
+dataset directory rather than `MTAH_DATA_DIR`, so it can skip despite a configured external dataset.
 
 ## Data
 
@@ -85,6 +96,18 @@ file byte for byte.
 Not used: the broadcast video and its tracking, the Smart Tagging, the homography, and the public
 5-minute ground truth (only the organisers' `run_evaluation.py` reads it, as a pipeline check).
 No external data covers the competition match.
+
+## Submission documents and privacy
+
+The [technical report](docs/technical_report.md) describes the implementation, provenance,
+limitations and evidence status. The [readiness checklist](docs/submission_readiness.md) records
+remaining delivery checks. The final filenames must use the registered team name; the validated
+working CSV is preserved separately. Markdown is an accepted technical-document format.
+
+Do not commit provided data, caches, generated predictions or secrets. Do not send provided data,
+predictions or local logs to AI services. Run any further match validation or reproduction locally
+yourself and share sanitized PASS/FAIL results only. Do not evaluate against competition ground
+truth, inspect video to check predictions, or tune on this match.
 
 ## Layout
 
