@@ -1,0 +1,11 @@
+{
+  "baseline": "190fbdefcec376f674727a194cd8ac34315a7d70",
+  "protected_files": 35,
+  "protected_integrity": "PASS",
+  "model_count": 12,
+  "model_integrity": "PASS",
+  "test_exit_code": 0,
+  "tests_passed": 10,
+  "test_seconds": 13.435,
+  "synthetic_tests": "PASS"
+}

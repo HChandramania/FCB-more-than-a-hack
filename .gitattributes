@@ -1,0 +1,2 @@
+# Preserve exact source, lockfile and checkpoint bytes on every platform.
+* -text
