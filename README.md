@@ -93,5 +93,6 @@ attribution and responsible use; this audit does not establish a blanket redistr
 Confirm applicable provider terms before downloading or retraining.
 
 Never commit competition files, derived predictions, credentials, caches or private logs.
-Keep the existing experimental repository private. This package imports no original branches,
-tags or historical commits; the baseline identifier above is provenance text only.
+Use `main` in `HChandramania/FCB-more-than-a-hack` as the official competition submission;
+other hosted branches are not the submitted implementation. This package imports no original
+branches, tags or historical commits; the baseline identifier above is provenance text only.
